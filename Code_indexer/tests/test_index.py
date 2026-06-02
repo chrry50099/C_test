@@ -12,7 +12,7 @@ def test_build_index_creates_queryable_database(tmp_path: Path) -> None:
 
     stats = build_index(FAKE_FW, db_path, ctags_executable="definitely-missing-ctags")
 
-    assert stats.files == 20
+    assert stats.files == 21
     assert stats.functions >= 25
     assert stats.calls >= 20
     assert stats.symbols >= stats.functions
@@ -28,4 +28,3 @@ def test_build_index_creates_queryable_database(tmp_path: Path) -> None:
     assert any(call.caller_name == "ftl_write" for call in callers)
     assert any(call.callee_name == "scheduler_enqueue" for call in callees)
     assert len(hints) >= 5
-

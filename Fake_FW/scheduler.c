@@ -5,6 +5,17 @@ void scheduler_init(scheduler_queue_t *queue)
     queue->head = 0;
     queue->tail = 0;
     queue->count = 0;
+
+#if FW_ENABLE_GC_WORKER
+    ssd_request_t flush_request = {
+        .lba = 0,
+        .length = 0,
+        .buffer = 0,
+        .type = SSD_IO_FLUSH,
+        .status = FW_OK,
+    };
+    (void)scheduler_enqueue(queue, &flush_request);
+#endif
 }
 
 fw_status_t scheduler_enqueue(scheduler_queue_t *queue, const ssd_request_t *request)
@@ -34,6 +45,11 @@ fw_status_t scheduler_process(scheduler_queue_t *queue, ftl_context_t *ftl)
     case SSD_IO_WRITE:
         status = ftl_write(ftl, request->lba, request->buffer);
         break;
+#if FW_ENABLE_GC_WORKER
+    case SSD_IO_FLUSH:
+        status = ftl_flush(ftl);
+        break;
+#endif
     /* BUG_HINT: SSD_IO_FLUSH is defined but scheduler_process does not handle it. */
     default:
         status = FW_ERR;
@@ -50,4 +66,3 @@ bool scheduler_has_pending(const scheduler_queue_t *queue)
 {
     return queue->count != 0u;
 }
-

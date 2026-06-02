@@ -2,8 +2,13 @@
 
 void wear_level_init(wear_level_context_t *wl)
 {
+#if FW_ENABLE_GC_WORKER
+    wl->high_watermark = 40;
+    wl->low_watermark = 4;
+#else
     wl->high_watermark = 80;
     wl->low_watermark = 8;
+#endif
 }
 
 void wear_level_record_erase(wear_level_context_t *wl, nand_device_t *dev, uint32_t block)
@@ -42,4 +47,3 @@ bool wear_level_needs_rotation(const wear_level_context_t *wl, const nand_device
     }
     return false;
 }
-

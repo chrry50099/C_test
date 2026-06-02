@@ -3,12 +3,15 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from code_indexer.models import CallSite, DebugHint, FunctionDef, IdentifierRef, SourceFile, Symbol
+from code_indexer.models import CallSite, CompileUnit, DebugHint, Diagnostic, FunctionDef, IdentifierRef, MacroConfig, SourceFile, Symbol
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
 
 DROP TABLE IF EXISTS debug_hints;
+DROP TABLE IF EXISTS macro_configs;
+DROP TABLE IF EXISTS diagnostics;
+DROP TABLE IF EXISTS compile_units;
 DROP TABLE IF EXISTS identifiers;
 DROP TABLE IF EXISTS calls;
 DROP TABLE IF EXISTS symbols;
@@ -80,11 +83,80 @@ CREATE TABLE debug_hints (
     text TEXT NOT NULL
 );
 
+CREATE TABLE compile_units (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL,
+    target TEXT NOT NULL,
+    profile TEXT NOT NULL,
+    command TEXT NOT NULL,
+    directory TEXT NOT NULL,
+    defines TEXT NOT NULL,
+    include_paths TEXT NOT NULL
+);
+
+CREATE TABLE diagnostics (
+    id INTEGER PRIMARY KEY,
+    source TEXT NOT NULL,
+    path TEXT NOT NULL,
+    line INTEGER,
+    column INTEGER,
+    severity TEXT NOT NULL,
+    message TEXT NOT NULL,
+    profile TEXT
+);
+
+CREATE TABLE macro_configs (
+    id INTEGER PRIMARY KEY,
+    profile TEXT NOT NULL,
+    name TEXT NOT NULL,
+    value TEXT,
+    UNIQUE(profile, name)
+);
+
 CREATE INDEX idx_functions_name ON functions(name);
 CREATE INDEX idx_calls_callee ON calls(callee_name);
 CREATE INDEX idx_calls_caller ON calls(caller_name);
 CREATE INDEX idx_symbols_name ON symbols(name);
 CREATE INDEX idx_identifiers_name ON identifiers(name);
+CREATE INDEX idx_compile_units_profile ON compile_units(profile);
+CREATE INDEX idx_diagnostics_profile ON diagnostics(profile);
+CREATE INDEX idx_macro_configs_profile ON macro_configs(profile);
+"""
+
+SUPPLEMENTAL_SCHEMA = """
+CREATE TABLE IF NOT EXISTS compile_units (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL,
+    target TEXT NOT NULL,
+    profile TEXT NOT NULL,
+    command TEXT NOT NULL,
+    directory TEXT NOT NULL,
+    defines TEXT NOT NULL,
+    include_paths TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS diagnostics (
+    id INTEGER PRIMARY KEY,
+    source TEXT NOT NULL,
+    path TEXT NOT NULL,
+    line INTEGER,
+    column INTEGER,
+    severity TEXT NOT NULL,
+    message TEXT NOT NULL,
+    profile TEXT
+);
+
+CREATE TABLE IF NOT EXISTS macro_configs (
+    id INTEGER PRIMARY KEY,
+    profile TEXT NOT NULL,
+    name TEXT NOT NULL,
+    value TEXT,
+    UNIQUE(profile, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_compile_units_profile ON compile_units(profile);
+CREATE INDEX IF NOT EXISTS idx_diagnostics_profile ON diagnostics(profile);
+CREATE INDEX IF NOT EXISTS idx_macro_configs_profile ON macro_configs(profile);
 """
 
 
@@ -104,7 +176,19 @@ class IndexDb:
         self.close()
 
     def summary(self) -> dict[str, int]:
-        tables = ["files", "modules", "functions", "calls", "symbols", "identifiers", "debug_hints"]
+        ensure_supplemental_schema(self.conn)
+        tables = [
+            "files",
+            "modules",
+            "functions",
+            "calls",
+            "symbols",
+            "identifiers",
+            "debug_hints",
+            "compile_units",
+            "diagnostics",
+            "macro_configs",
+        ]
         return {table: self.conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in tables}
 
     def get_symbol(self, name: str) -> list[Symbol]:
@@ -169,6 +253,39 @@ class IndexDb:
         ).fetchall()
         return [DebugHint(path=row["path"], line=row["line"], text=row["text"]) for row in rows]
 
+    def get_variants(self) -> list[MacroConfig]:
+        ensure_supplemental_schema(self.conn)
+        rows = self.conn.execute(
+            """
+            SELECT profile, name, value
+            FROM macro_configs
+            ORDER BY profile, name
+            """
+        ).fetchall()
+        return [MacroConfig(profile=row["profile"], name=row["name"], value=row["value"]) for row in rows]
+
+    def get_diagnostics(self) -> list[Diagnostic]:
+        ensure_supplemental_schema(self.conn)
+        rows = self.conn.execute(
+            """
+            SELECT source, path, line, column, severity, message, profile
+            FROM diagnostics
+            ORDER BY source, profile, path, line, column
+            """
+        ).fetchall()
+        return [
+            Diagnostic(
+                source=row["source"],
+                rel_path=row["path"],
+                line=row["line"],
+                column=row["column"],
+                severity=row["severity"],
+                message=row["message"],
+                profile=row["profile"],
+            )
+            for row in rows
+        ]
+
 
 def initialize_database(db_path: Path | str) -> sqlite3.Connection:
     path = Path(db_path)
@@ -177,6 +294,20 @@ def initialize_database(db_path: Path | str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     return conn
+
+
+def open_database(db_path: Path | str) -> sqlite3.Connection:
+    path = Path(db_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    ensure_supplemental_schema(conn)
+    return conn
+
+
+def ensure_supplemental_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(SUPPLEMENTAL_SCHEMA)
+    conn.commit()
 
 
 def insert_index(
@@ -283,6 +414,73 @@ def insert_index(
     conn.commit()
 
 
+def replace_compile_units(conn: sqlite3.Connection, units: list[CompileUnit]) -> None:
+    ensure_supplemental_schema(conn)
+    conn.execute("DELETE FROM compile_units")
+    conn.execute("DELETE FROM macro_configs")
+
+    for unit in units:
+        conn.execute(
+            """
+            INSERT INTO compile_units(path, target, profile, command, directory, defines, include_paths)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                unit.rel_path,
+                unit.target,
+                unit.profile,
+                unit.command,
+                unit.directory,
+                _json_dump(unit.defines),
+                _json_dump(unit.include_paths),
+            ),
+        )
+        for name, value in unit.defines.items():
+            conn.execute(
+                """
+                INSERT INTO macro_configs(profile, name, value)
+                VALUES (?, ?, ?)
+                ON CONFLICT(profile, name) DO UPDATE SET value = excluded.value
+                """,
+                (unit.profile, name, value),
+            )
+
+    conn.commit()
+
+
+def replace_diagnostics(conn: sqlite3.Connection, diagnostics: list[Diagnostic], source: str | None = None) -> None:
+    ensure_supplemental_schema(conn)
+    if source is None:
+        conn.execute("DELETE FROM diagnostics")
+    else:
+        conn.execute("DELETE FROM diagnostics WHERE source = ?", (source,))
+
+    for diagnostic in diagnostics:
+        conn.execute(
+            """
+            INSERT INTO diagnostics(source, path, line, column, severity, message, profile)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                diagnostic.source,
+                diagnostic.rel_path,
+                diagnostic.line,
+                diagnostic.column,
+                diagnostic.severity,
+                diagnostic.message,
+                diagnostic.profile,
+            ),
+        )
+
+    conn.commit()
+
+
+def _json_dump(value: object) -> str:
+    import json
+
+    return json.dumps(value, sort_keys=True)
+
+
 def tree_sitter_function_symbols(functions: list[FunctionDef]) -> list[Symbol]:
     return [
         Symbol(
@@ -308,4 +506,3 @@ def _call_site(row: sqlite3.Row) -> CallSite:
         column=row["column"],
         resolved=row["resolved_callee_id"] is not None,
     )
-

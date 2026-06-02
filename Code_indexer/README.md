@@ -13,6 +13,9 @@ cd D:\Work_D\C_test\Code_indexer
 uv sync
 ```
 
+The Python side of libclang is installed by `uv` through the `libclang`
+dependency in `pyproject.toml`.
+
 Universal Ctags is optional for smoke tests but required for full macro,
 struct, enum, typedef, and prototype coverage:
 
@@ -67,6 +70,40 @@ winget install --id Kitware.CMake -e
 winget install --id LLVM.LLVM -e
 ```
 
+After installing LLVM, open a new PowerShell and verify:
+
+```powershell
+clang --version
+clangd --version
+```
+
+## Fake Firmware Variants
+
+`Fake_FW/conf.h` defines CPU-specific macro switches:
+
+```c
+#define FW_CPU0 0
+#define FW_CPU1 1
+
+#ifndef FW_CPU_ID
+#define FW_CPU_ID FW_CPU0
+#endif
+```
+
+`Fake_FW/CMakeLists.txt` builds two targets:
+
+```text
+fake_ssd_fw_cpu0 -> -DFW_CPU_ID=0
+fake_ssd_fw_cpu1 -> -DFW_CPU_ID=1
+```
+
+Generate a compile database for clangd/libclang:
+
+```powershell
+cmake -S ..\Fake_FW -B ..\Fake_FW\build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build ..\Fake_FW\build
+```
+
 ## CLI
 
 ```powershell
@@ -81,6 +118,28 @@ uv run code-index debug-hints --db .\index.sqlite
 `scan` continues when `ctags` is missing and records tree-sitter function
 symbols. Use `--require-ctags` if a missing ctags executable should fail the
 scan.
+
+Additional clang-oriented commands:
+
+```powershell
+uv run code-index doctor ..\Fake_FW --compile-commands ..\Fake_FW\build\compile_commands.json
+uv run code-index compile-db ..\Fake_FW --compile-commands ..\Fake_FW\build\compile_commands.json --db .\index.sqlite
+uv run code-index variants --db .\index.sqlite
+uv run code-index clangd-check ..\Fake_FW\ftl.c --compile-commands ..\Fake_FW\build --db .\index.sqlite
+uv run code-index libclang-scan ..\Fake_FW --compile-commands ..\Fake_FW\build\compile_commands.json --db .\index.sqlite
+uv run code-index diagnostics --db .\index.sqlite
+```
+
+Tool roles:
+
+- tree-sitter: fast syntax parsing for functions, call expressions, and identifiers.
+- Universal Ctags: fast symbol inventory for functions, macros, structs, enums, typedefs, and prototypes.
+- clangd: compiler-aware diagnostics and IDE-style checks using `compile_commands.json`.
+- libclang: Python-accessible semantic diagnostics using the same per-target compile arguments.
+
+`libclang-scan` needs enough compiler context to find standard C headers such
+as `stdbool.h`. If diagnostics report missing standard headers, install LLVM and
+generate a real CMake `compile_commands.json` before rerunning the scan.
 
 ## Tests
 

@@ -18,6 +18,13 @@ int32_t gc_choose_victim(const gc_context_t *gc, const nand_device_t *dev)
 
 fw_status_t gc_run(gc_context_t *gc, nand_device_t *dev, wear_level_context_t *wl, bad_block_manager_t *bbm)
 {
+#if !FW_ENABLE_GC_WORKER && !FW_ENABLE_NVME_FRONTEND
+    (void)gc;
+    (void)dev;
+    (void)wl;
+    (void)bbm;
+    return FW_ERR_BUSY;
+#else
     /* BUG_HINT: gc_choose_victim can return -1 but this code casts it to an unsigned block id. */
     uint32_t victim = (uint32_t)gc_choose_victim(gc, dev);
 
@@ -32,5 +39,5 @@ fw_status_t gc_run(gc_context_t *gc, nand_device_t *dev, wear_level_context_t *w
         gc->reclaimed_blocks++;
     }
     return status;
+#endif
 }
-

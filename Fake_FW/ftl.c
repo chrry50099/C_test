@@ -47,11 +47,15 @@ fw_status_t ftl_write(ftl_context_t *ftl, uint32_t lba, const uint8_t *buffer)
         return FW_ERR_RANGE;
     }
     if (ftl->next_free_ppa >= FW_TOTAL_PAGES) {
+#if FW_ENABLE_GC_WORKER
+        return FW_ERR_NO_SPACE;
+#else
         fw_status_t gc_status = gc_run(ftl->gc, ftl->nand, ftl->wl, ftl->bbm);
         if (gc_status != FW_OK) {
             return gc_status;
         }
         ftl->next_free_ppa = 0;
+#endif
     }
 
     while (ftl->next_free_ppa < FW_TOTAL_PAGES &&
@@ -83,4 +87,3 @@ uint32_t ftl_resolve_ppa(const ftl_context_t *ftl, uint32_t lba)
     }
     return ftl->l2p[lba];
 }
-

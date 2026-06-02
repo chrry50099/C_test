@@ -17,6 +17,12 @@ void nvme_controller_init(nvme_controller_t *ctrl)
 
 fw_status_t nvme_submit_read(nvme_controller_t *ctrl, uint32_t lba, uint8_t *buffer)
 {
+#if !FW_ENABLE_NVME_FRONTEND
+    (void)ctrl;
+    (void)lba;
+    (void)buffer;
+    return FW_ERR_BUSY;
+#else
     ssd_request_t request = {
         .lba = lba,
         .length = 1,
@@ -25,10 +31,17 @@ fw_status_t nvme_submit_read(nvme_controller_t *ctrl, uint32_t lba, uint8_t *buf
         .status = FW_OK,
     };
     return scheduler_enqueue(&ctrl->queue, &request);
+#endif
 }
 
 fw_status_t nvme_submit_write(nvme_controller_t *ctrl, uint32_t lba, const uint8_t *buffer)
 {
+#if !FW_ENABLE_NVME_FRONTEND
+    (void)ctrl;
+    (void)lba;
+    (void)buffer;
+    return FW_ERR_BUSY;
+#else
     ssd_request_t request = {
         .lba = lba,
         .length = 1,
@@ -37,6 +50,7 @@ fw_status_t nvme_submit_write(nvme_controller_t *ctrl, uint32_t lba, const uint8
         .status = FW_OK,
     };
     return scheduler_enqueue(&ctrl->queue, &request);
+#endif
 }
 
 fw_status_t nvme_poll(nvme_controller_t *ctrl)
@@ -55,4 +69,3 @@ fw_status_t nvme_poll(nvme_controller_t *ctrl)
     }
     return FW_OK;
 }
-

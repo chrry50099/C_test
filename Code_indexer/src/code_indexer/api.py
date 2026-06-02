@@ -2,8 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from code_indexer.clang_tools import run_clangd_check, run_libclang_scan
+from code_indexer.compile_db import load_compile_database
 from code_indexer.ctags import CtagsUnavailable, run_ctags
-from code_indexer.db import IndexDb, initialize_database, insert_index, tree_sitter_function_symbols
+from code_indexer.db import (
+    IndexDb,
+    initialize_database,
+    insert_index,
+    open_database,
+    replace_compile_units,
+    replace_diagnostics,
+    tree_sitter_function_symbols,
+)
 from code_indexer.models import CallExpr, DebugHint, FunctionDef, IdentifierRef, IndexStats, Symbol
 from code_indexer.parser import CParser
 from code_indexer.scanner import discover_c_files
@@ -67,3 +77,35 @@ def build_index(
 def open_index(db_path: Path | str) -> IndexDb:
     return IndexDb(db_path)
 
+
+def ingest_compile_database(repo_root: Path | str, compile_commands: Path | str, db_path: Path | str) -> int:
+    units = load_compile_database(compile_commands, repo_root)
+    conn = open_database(db_path)
+    try:
+        replace_compile_units(conn, units)
+    finally:
+        conn.close()
+    return len(units)
+
+
+def clangd_check(source_file: Path | str, compile_commands_dir: Path | str, db_path: Path | str | None = None) -> int:
+    diagnostics = run_clangd_check(source_file, compile_commands_dir)
+    if db_path is not None:
+        conn = open_database(db_path)
+        try:
+            replace_diagnostics(conn, diagnostics, source="clangd")
+        finally:
+            conn.close()
+    return len(diagnostics)
+
+
+def libclang_scan(repo_root: Path | str, compile_commands: Path | str, db_path: Path | str) -> int:
+    units = load_compile_database(compile_commands, repo_root)
+    diagnostics = run_libclang_scan(repo_root, compile_commands)
+    conn = open_database(db_path)
+    try:
+        replace_compile_units(conn, units)
+        replace_diagnostics(conn, diagnostics, source="libclang")
+    finally:
+        conn.close()
+    return len(diagnostics)

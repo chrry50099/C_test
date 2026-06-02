@@ -1,6 +1,8 @@
 #ifndef FW_TYPES_H
 #define FW_TYPES_H
 
+#include "conf.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -47,4 +49,3 @@ static inline uint32_t fw_block_of_page(uint32_t ppa)
 }
 
 #endif
-

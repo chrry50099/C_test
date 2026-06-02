@@ -12,7 +12,7 @@ def test_cli_scan_summary_and_query(tmp_path: Path, capsys) -> None:
 
     assert main(["scan", str(FAKE_FW), "--db", str(db_path), "--ctags", "definitely-missing-ctags"]) == 0
     scan_out = capsys.readouterr().out
-    assert "files=20" in scan_out
+    assert "files=21" in scan_out
     assert "ctags=not-used" in scan_out
 
     assert main(["summary", "--db", str(db_path)]) == 0

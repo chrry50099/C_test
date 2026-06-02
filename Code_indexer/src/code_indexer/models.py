@@ -72,6 +72,36 @@ class DebugHint:
 
 
 @dataclass(frozen=True)
+class MacroConfig:
+    profile: str
+    name: str
+    value: str | None
+
+
+@dataclass(frozen=True)
+class CompileUnit:
+    rel_path: str
+    directory: str
+    command: str
+    target: str
+    profile: str
+    defines: dict[str, str | None]
+    include_paths: list[str]
+    arguments: list[str]
+
+
+@dataclass(frozen=True)
+class Diagnostic:
+    source: str
+    rel_path: str
+    line: int | None
+    column: int | None
+    severity: str
+    message: str
+    profile: str | None
+
+
+@dataclass(frozen=True)
 class ParsedFile:
     functions: list[FunctionDef]
     calls: list[CallExpr]
@@ -89,4 +119,3 @@ class IndexStats:
     debug_hints: int
     ctags_used: bool
     ctags_error: str | None = None
-
