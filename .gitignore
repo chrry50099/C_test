@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# uv / virtual environments
+.venv/
+
+# Generated indexer artifacts
+Code_indexer/index.sqlite
+*.sqlite
+*.sqlite3
+
+# C/CMake build artifacts
+Fake_FW/build/
+build/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# ctags output
+tags
+
