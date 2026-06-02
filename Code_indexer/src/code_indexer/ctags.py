@@ -22,6 +22,7 @@ def run_ctags(repo_root: Path | str, executable: str = "ctags") -> list[Symbol]:
         exe,
         "--output-format=json",
         "--languages=C",
+        "--map-C=+.h",
         "--fields=+nKSt",
         "--kinds-C=+defgmpstuvx",
         "-R",

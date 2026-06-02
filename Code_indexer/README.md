@@ -20,6 +20,45 @@ struct, enum, typedef, and prototype coverage:
 winget install --id UniversalCtags.Ctags -e
 ```
 
+If `ctags` is installed but not visible in the current terminal PATH, add the
+winget-installed directory to the user PATH:
+
+```powershell
+$ctags = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter ctags.exe -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match "UniversalCtags" } |
+    Select-Object -First 1
+
+$ctagsDir = Split-Path -Parent $ctags.FullName
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($userPath -notlike "*$ctagsDir*") {
+    [Environment]::SetEnvironmentVariable("Path", "$userPath;$ctagsDir", "User")
+}
+
+# Also update the current PowerShell session so ctags works immediately.
+if ($env:Path -notlike "*$ctagsDir*") {
+    $env:Path = "$env:Path;$ctagsDir"
+}
+
+ctags --version
+```
+
+Future PowerShell windows will inherit the user PATH. Verify with:
+
+```powershell
+ctags --version
+uv run code-index scan ..\Fake_FW --db .\index.sqlite
+```
+
+Alternatively, pass the executable explicitly without changing PATH:
+
+```powershell
+$ctags = Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter ctags.exe -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match "UniversalCtags" } |
+    Select-Object -First 1 -ExpandProperty FullName
+
+uv run code-index scan ..\Fake_FW --db .\index.sqlite --ctags $ctags
+```
+
 To compile `Fake_FW`, install CMake and a C compiler if they are not already in
 `PATH`:
 
