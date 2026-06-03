@@ -25,3 +25,13 @@ def test_parser_extracts_debug_hints() -> None:
     assert "off-by-one" in hint_text
     assert "null buffer" in hint_text
 
+
+def test_parser_handles_deep_ast_without_python_recursion(tmp_path: Path) -> None:
+    depth = 1500
+    source = "void deep(void) {\n" + ("{\n" * depth) + ("}\n" * depth) + "}\n"
+    path = tmp_path / "deep.c"
+    path.write_text(source, encoding="utf-8")
+
+    parsed = CParser().parse_file(path, "deep.c")
+
+    assert [function.name for function in parsed.functions] == ["deep"]

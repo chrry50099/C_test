@@ -142,9 +142,11 @@ def _clean_hint_text(text: str) -> str:
 
 
 def _walk(node: Node):
-    yield node
-    for child in node.children:
-        yield from _walk(child)
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        yield current
+        stack.extend(reversed(current.children))
 
 
 def _first_child_of_type(node: Node, node_type: str) -> Node | None:

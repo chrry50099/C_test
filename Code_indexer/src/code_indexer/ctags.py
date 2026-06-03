@@ -30,7 +30,15 @@ def run_ctags(repo_root: Path | str, executable: str = "ctags") -> list[Symbol]:
         "-",
         ".",
     ]
-    result = subprocess.run(command, cwd=root, check=False, capture_output=True, text=True)
+    result = subprocess.run(
+        command,
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     if result.returncode != 0:
         raise CtagsUnavailable(result.stderr.strip() or "ctags failed")
 
