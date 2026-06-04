@@ -104,6 +104,10 @@ cmake -S ..\Fake_FW -B ..\Fake_FW\build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build ..\Fake_FW\build
 ```
 
+`Fake_FW/expansion` contains generated subsystem modules for lightweight stress
+testing. They include Traditional Chinese comments and cross-module calls so the
+indexer sees a larger file set, more symbols, and a deeper call graph.
+
 ## CLI
 
 ```powershell
@@ -129,6 +133,15 @@ uv run code-index clangd-check ..\Fake_FW\ftl.c --compile-commands ..\Fake_FW\bu
 uv run code-index libclang-scan ..\Fake_FW --compile-commands ..\Fake_FW\build\compile_commands.json --db .\index.sqlite
 uv run code-index diagnostics --db .\index.sqlite
 ```
+
+Long-running commands print command-level timing in a parseable format:
+
+```text
+elapsed command=scan seconds=0.123
+```
+
+Timing is currently emitted for `scan`, `compile-db`, `doctor`, `clangd-check`,
+and `libclang-scan`.
 
 Tool roles:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import time
 
 from code_indexer.api import build_index, open_index
 from code_indexer.clang_tools import run_clangd_check, run_libclang_scan
@@ -10,38 +11,43 @@ from code_indexer.ctags import CtagsUnavailable
 from code_indexer.db import open_database, replace_compile_units, replace_diagnostics
 from code_indexer.toolchain import run_doctor
 
+TIMED_COMMANDS = {"scan", "compile-db", "doctor", "clangd-check", "libclang-scan"}
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-
-    if args.command == "scan":
-        return _scan(args)
-    if args.command == "summary":
-        return _summary(args)
-    if args.command == "symbol":
-        return _symbol(args)
-    if args.command == "callers":
-        return _callers(args)
-    if args.command == "callees":
-        return _callees(args)
-    if args.command == "debug-hints":
-        return _debug_hints(args)
-    if args.command == "compile-db":
-        return _compile_db(args)
-    if args.command == "variants":
-        return _variants(args)
-    if args.command == "diagnostics":
-        return _diagnostics(args)
-    if args.command == "doctor":
-        return _doctor(args)
-    if args.command == "clangd-check":
-        return _clangd_check(args)
-    if args.command == "libclang-scan":
-        return _libclang_scan(args)
+    handlers = {
+        "scan": _scan,
+        "summary": _summary,
+        "symbol": _symbol,
+        "callers": _callers,
+        "callees": _callees,
+        "debug-hints": _debug_hints,
+        "compile-db": _compile_db,
+        "variants": _variants,
+        "diagnostics": _diagnostics,
+        "doctor": _doctor,
+        "clangd-check": _clangd_check,
+        "libclang-scan": _libclang_scan,
+    }
+    handler = handlers.get(args.command)
+    if handler is not None:
+        if args.command in TIMED_COMMANDS:
+            return _run_timed(args.command, handler, args)
+        return handler(args)
 
     parser.print_help()
     return 1
+
+
+def _run_timed(command: str, handler, args: argparse.Namespace) -> int:
+    started = time.perf_counter()
+    try:
+        return handler(args)
+    finally:
+        elapsed = time.perf_counter() - started
+        print(f"elapsed command={command} seconds={elapsed:.3f}")
 
 
 def _build_parser() -> argparse.ArgumentParser:

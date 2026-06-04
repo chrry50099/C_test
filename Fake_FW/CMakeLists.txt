@@ -6,9 +6,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+file(GLOB_RECURSE FAKE_SSD_FW_EXPANSION_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/expansion/*.c
+)
+
 set(FAKE_SSD_FW_SOURCES
     main.c
     fw_log.c
+    fw_ext_registry.c
     nand.c
     ftl.c
     gc.c
@@ -17,6 +22,7 @@ set(FAKE_SSD_FW_SOURCES
     cache.c
     scheduler.c
     nvme.c
+    ${FAKE_SSD_FW_EXPANSION_SOURCES}
 )
 
 add_executable(fake_ssd_fw_cpu0 ${FAKE_SSD_FW_SOURCES})

@@ -1,5 +1,6 @@
 #include "nvme.h"
 
+#include "fw_ext_registry.h"
 #include "fw_log.h"
 
 #include <stdio.h>
@@ -8,6 +9,7 @@
 int main(void)
 {
     nvme_controller_t ctrl;
+    fw_ext_registry_t ext_registry = {0};
     uint8_t write_buf[FW_PAGE_SIZE];
     uint8_t read_buf[FW_PAGE_SIZE];
 
@@ -15,6 +17,7 @@ int main(void)
     memset(read_buf, 0, sizeof(read_buf));
 
     nvme_controller_init(&ctrl);
+    fw_ext_registry_bootstrap(&ext_registry);
     fw_log(FW_LOG_INFO, "boot", FW_CPU_NAME);
 
 #if FW_ENABLE_NVME_FRONTEND
@@ -33,8 +36,10 @@ int main(void)
     nvme_poll(&ctrl);
 
     printf("read_buf[0]=0x%02X\n", read_buf[0]);
+    (void)fw_ext_registry_poll(&ext_registry, read_buf[0]);
 #else
     fw_status_t submit_status = nvme_poll(&ctrl);
+    (void)fw_ext_registry_poll(&ext_registry, submit_status == FW_OK ? 1u : 0u);
     printf("gc worker poll status=%s\n", fw_status_name(submit_status));
 #endif
     return 0;

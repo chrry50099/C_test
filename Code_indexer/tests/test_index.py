@@ -12,7 +12,7 @@ def test_build_index_creates_queryable_database(tmp_path: Path) -> None:
 
     stats = build_index(FAKE_FW, db_path, ctags_executable="definitely-missing-ctags")
 
-    assert stats.files == 21
+    assert stats.files == 203
     assert stats.functions >= 25
     assert stats.calls >= 20
     assert stats.symbols >= stats.functions

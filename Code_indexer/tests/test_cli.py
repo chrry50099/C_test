@@ -12,12 +12,14 @@ def test_cli_scan_summary_and_query(tmp_path: Path, capsys) -> None:
 
     assert main(["scan", str(FAKE_FW), "--db", str(db_path), "--ctags", "definitely-missing-ctags"]) == 0
     scan_out = capsys.readouterr().out
-    assert "files=21" in scan_out
+    assert "files=203" in scan_out
     assert "ctags=not-used" in scan_out
+    assert "elapsed command=scan seconds=" in scan_out
 
     assert main(["summary", "--db", str(db_path)]) == 0
     summary_out = capsys.readouterr().out
     assert "functions:" in summary_out
+    assert "elapsed command=summary" not in summary_out
 
     assert main(["callees", "nvme_submit_write", "--db", str(db_path)]) == 0
     callees_out = capsys.readouterr().out
@@ -27,4 +29,3 @@ def test_cli_scan_summary_and_query(tmp_path: Path, capsys) -> None:
     hints_out = capsys.readouterr().out
     assert "BUG_HINT" not in hints_out
     assert "off-by-one" in hints_out
-
